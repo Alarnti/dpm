@@ -15,29 +15,14 @@ def get_train():
 	train_images_neg = []
 
 	#GETTING TRAINIG IMAGES
-	#this is bad, rewrite
-	#-->
-
-	#less_10 = True
-	#additional_symbol = '0'
-	for count in range(0,500):
-		#if less_10:
-		#	if count >= 10:
-		#		additional_symbol = ''
-		#		less_10 = False
-
+	
+	for count in range(0,550):
+	
 		input_image = io.imread('CarData/TrainImages/pos-' + str(count) + '.pgm')
 		train_images_pos.append(color.rgb2gray(input_image))
 
-	#additional_symbol = '0'
-	#less_10 = True
-
 	for count in range(0,500):
-		#if less_10:
-		#	if count >= 10:
-		#		additional_symbol = ''
-		#		less_10 = False		
-		
+	
 		input_image = io.imread('CarData/TrainImages/neg-' + str(count) + '.pgm')
 		train_images_neg.append(color.rgb2gray(input_image))
 	
@@ -87,15 +72,9 @@ def get_training_XY(positive_im, negative_im):#positions,
 	#Positive
 	for i in range(0,500):
 		im = Image.fromarray(positive_im[i])
-		#for el in positions[i]:
-		#	x = int(el[0])
-		#	y = int(el[1])
-		#	dx = int(el[2])
-		#	dy = int(el[3])
 
-		#	crop = resize(np.asarray(im.crop((x,y,x+dx,y+dy))),(H,W))
-		#	hog_feature = hog(crop, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2), visualise=False)
-		hog_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2), visualise=False)
+		hog_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))#, #transform_sqrt=True)
+
 		X.append(hog_feature)
 		Y.append('1')
 
@@ -103,25 +82,25 @@ def get_training_XY(positive_im, negative_im):#positions,
 	import random
 	for i in range(0,500):
 		im = Image.fromarray(negative_im[i])
-		#for count in range(0,50):
 
-			# x = int(random.random()*(im.size[0] - W - 5)) + 1
-			# y = int(random.random()*(im.size[1] - H - 5)) + 1
-			# dx = W #int(random.random()*(im.size[0] - x - 1)) + 1
-			# dy = H #int(random.random()*(im.size[1] - y - 1)) + 1
+		hog_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))#, #transform_sqrt=True)
 
-			# crop = np.asarray(im.crop((x,y,x+dx,y+dy)))
-			# hog_feature = hog(crop, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2), visualise=False)
-
-		hog_feature = hog_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2), visualise=False)
 		X.append(hog_feature)
 		Y.append('0')
-
 		
 	return X,Y	
+
+
 	
 
 def test_with_show(clf_root, image):
+
+	import time
+
+	
+
+        
+
 
 	H = 40
 	W = 100
@@ -133,34 +112,49 @@ def test_with_show(clf_root, image):
 	
 	rescale_coeff = 1
 
-	while int(image.size[1]*rescale_coeff) >= H and int(image.size[0]*rescale_coeff) >= W:
+	origin_image = Image.fromarray(np.copy(np.asarray(image)))
+
+	images_scales = []
+	
+	while int(origin_image.size[1]*rescale_coeff) >= H and int(origin_image.size[0]*rescale_coeff) >= W:
+		start = time.time()	
+		origin_image_rescaled = Image.fromarray(transform.rescale(np.asarray(origin_image),rescale_coeff))
+		dr = ImageDraw.Draw(origin_image_rescaled)
 		
-		image = Image.fromarray(transform.rescale(np.asarray(image),rescale_coeff))
-		dr = ImageDraw.Draw(image)
+		
 
 		x = 0
 		y = 0
 
-		while  y + H <= image.size[1]:
+		while  y + H <= origin_image_rescaled.size[1]:
 			x = 0
-			while x + W <= image.size[0]:
-				im = np.asarray(image.crop((x,y,x+W,y+H)))					    
-				hog_feature = hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2), visualise=False)
+			while x + W <= origin_image_rescaled.size[0]:
+				im = np.asarray(origin_image_rescaled.crop((y,x,y+H,x+W)))					    
+				hog_feature = hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))#, #transform_sqrt=True)
 				cl = clf_root.predict([hog_feature])
 
 				#print x,y, image.size[0],image.size[1], y + H, cl
 				if cl[0] == '1':
-					print cl
+					#print cl
 					dr.rectangle(((x,y),(x+W,y+H)), fill = None, outline = None)
 		
 				x += 1
 			y = y + 1
-	
-		plt.imshow(np.asarray(image))
-		plt.show()
-		rescale_coeff *= 2.0/3
 
-def test(clf_root, image):
+
+		images_scales.append(np.asarray(origin_image_rescaled))
+	
+		end = time.time()
+		print end - start
+		
+		rescale_coeff *= 1.0/2
+		del dr
+
+	show_images(images_scales)
+		
+	
+
+def test_boxes(clf_root, image):
 
 	H = 40
 	W = 100
@@ -184,8 +178,8 @@ def test(clf_root, image):
 		while  y + H <= image.size[1]:
 			x = 0
 			while x + W <= image.size[0]:
-				im = np.asarray(image.crop((x,y,x+W,y+H)))					    
-				hog_feature = hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2), visualise=False)
+				im = np.asarray(image.crop((y,x,y+H,x+W)))					    
+				hog_feature = hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))#, transform_sqrt=True )
 				cl = clf_root.predict([hog_feature])
 
 				if cl[0] == '1':
@@ -222,7 +216,7 @@ def testing(clf_root):
 			print el
 
 		input_image = io.imread('CarData/TestImages/test-' + str(count) + '.pgm')
-		im_boxes = test(clf_root, Image.fromarray(input_image))
+		im_boxes = test_boxes(clf_root, Image.fromarray(input_image))
 		
 		for box in im_boxes:
 			
@@ -238,6 +232,28 @@ def testing(clf_root):
 	annotations.close()
 	return truepos, falsepos
 
+#14%
+
+def testing_train(clf_root, X, Y):
+	#TestImages
+	#annotations = open('CarData/trueLocations.txt','r')
+
+	from PIL import Image
+
+	truepos = 0
+	falsepos = 0
+
+	founded_obj = 0
+
+	count = 0
+	for window in X:
+		if clf_root.predict([window])[0] == Y[count]:
+			truepos += 1
+		else: 
+			falsepos += 1
+		count += 1
+
+	return truepos, falsepos
 
 def train_root(X,Y, C):
 	from sklearn import svm
@@ -246,47 +262,55 @@ def train_root(X,Y, C):
 	return clf_root
 	
 	
-	
+def get_test_im_small():
+	annotations = open('CarData/trueLocations.txt','r')
+
+	from PIL import Image
+
+	X_test = []
+	Y_test = []
+
+	truepos = 0
+	falsepos = 0
+
+	for count in range(0,170):
+		objects_raw = annotations.readline().replace('\n','').split(' ')[1:]
+		objects = []
+		for el in objects_raw:
+			height = int(el.replace('(','').replace(')','').split(',')[0])
+			width = int(el.replace('(','').replace(')','').split(',')[1])
+			objects.append([height,width])
+
+		input_image = io.imread('CarData/TestImages/test-' + str(count) + '.pgm')
+
+		for obj in objects:
+			w = obj[0] # height
+			h = obj[1] # width
+			if obj[1] < 0:
+				h = 0
+			if obj[0] < 0:
+				w = 0
+			im = np.asarray(Image.fromarray(input_image).crop((h,w,h+40,w+100)))					    
+			X_test.append(hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2)))#, #transform_sqrt=True))
+			Y_test.append('1')
+				
+	annotations.close()
+	return X_test, Y_test
 
 
 
-
-#fd0001 = hog(test0001, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2),visualise=False)
-"""
-
-maxX = 0
-maxY = 0
-maxS = 0
-for ima in positions:
-	for el in ima:
-		x = int(el[0])
-		y = int(el[1])
-		dx = int(el[2])
-		dy = int(el[3])
-		S = dx*dy
-		if S > maxS:
-			maxX = max(maxX,dx)
-			maxY = max(maxY,dy)
-			maxS = S
-
-im = Image.fromarray(test_image)
-
-	fd0001, hog_image = hog(test0001, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
-
-
-	fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 8), sharex=True, sharey=True)
-
-	ax1.axis('off')
-	ax1.imshow(image, cmap=plt.cm.gray)
-	ax1.set_title('Input image')
-	ax1.set_adjustable('box-forced')
-
-	# Rescale histogram for better display
-	hog_image_rescaled = exposure.rescale_intensity(hog_image, in_range=(0, 0.02))
-
-	ax2.axis('off')
-	ax2.imshow(hog_image_rescaled, cmap=plt.cm.gray)
-	ax2.set_title('Histogram of Oriented Gradients')
-	ax1.set_adjustable('box-forced')
-	plt.show()
-"""
+def show_images(images,titles=None):
+    """Display a list of images"""
+    n_ims = len(images)
+    if titles is None: titles = ['(%d)' % i for i in range(1,n_ims + 1)]
+    fig = plt.figure()
+    n = 1
+    for image,title in zip(images,titles):
+        a = fig.add_subplot(1,n_ims,n) # Make subplot
+        #if image.ndim == 2: # Is image grayscale?
+        #    plt.gray() # Only place in this blog you can't replace 'gray' with 'grey'
+        plt.imshow(image)
+        a.set_title(title)
+        n += 1
+    fig.set_size_inches(np.array(fig.get_size_inches()) * n_ims)
+    plt.show()
