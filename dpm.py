@@ -9,6 +9,12 @@ from PIL import Image
 
 from skimage import io
 
+
+
+'''
+plans -> 7 adaboosts with changed distance of partfilters
+'''
+
 class PartFilter:
 	"""Here F is a part filter(HOG), v is a two-dimensional vector specifying the center for
 a box of possible positions for part relative to the root position,
@@ -26,9 +32,59 @@ the part.   """
 
 class DPM:
 	
+	image_h = 40
+	image_w = 100
+
 	step_x = 4
 	step_y = 2
-	#from Car_Detection place
+	
+	#HOG configuration
+	pix_per_cell_root = 8
+	cells_per_block_root = 2
+	
+	pix_per_cell_part_part = 4
+	cells_per_block_part = 2
+
+	# our partfilters
+	parts = []
+
+	
+	# partfilter size
+	part_w = 30
+	part_h = 20
+
+	def __init__(
+		self, 
+		step_x = 4, 
+		step_y = 2, 
+		pix_per_cell_root = 8, 
+		cells_per_block_root = 2, 
+		pix_per_cell_part = 4, 
+		cells_per_block_part = 2, 
+		parts = [], 
+		part_w = 30, 
+		part_h = 20):
+
+		self.step_x = step_x
+		self.step_y = step_y
+
+		#HOG configuration
+		self.pix_per_cell_root = pix_per_cell_root
+		self.cells_per_block_root = cells_per_block_root
+	
+		self.pix_per_cell_part = pix_per_cell_part
+		self.cells_per_block_part = cells_per_block_part
+
+		# our partfilters 
+		#ADD more Documentation
+		self.parts = parts
+	
+		# partfilter size
+		self.part_w = part_w
+		self.part_h = part_h
+
+
+
 	def get_train(self):
 		train_images_pos = []
 		train_images_neg = []
@@ -55,7 +111,8 @@ class DPM:
 		#TRAIN ROOT-FILTER 
 		#scikit-learn svm with --sliding windows
 
-	def get_training_XY(self, positive_im, negative_im):
+
+	def get_training_XY(self, positive_im, negative_im, pix_per_cell = 8, cells_per_bl = 2, is_svm = False):
 		X = []
 		Y = []
 	
@@ -71,7 +128,7 @@ class DPM:
 		for i in range(0,500):
 			im = Image.fromarray(positive_im[i])
 
-			hog_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
+			hog_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
 			X.append(hog_feature)
 			Y.append('1')
@@ -81,7 +138,7 @@ class DPM:
 		for i in range(0,500):
 			im = Image.fromarray(negative_im[i])
 
-			hog_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
+			hog_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
 			X.append(hog_feature)
 			Y.append('0')
@@ -89,25 +146,37 @@ class DPM:
 		self.X = X
 		self.Y = Y
 		self.X_norm = []
-		for el in X:
-			self.X_norm.append(el/(0.0 + np.sqrt(np.dot(el,el))))
+		if is_svm:
+			for el in X:
+				self.X_norm.append(el/(0.0 + np.sqrt(np.dot(el,el))))
+			return X_norm, Y
 		return X,Y	
 
 
-	def train_root(self, X,Y, C):
-		from sklearn import svm
-		clf_root = svm.LinearSVC(C=C)
-		clf_root.fit(X,Y)
-		self.clf_root = clf_root
-		return clf_root
 
 
+	def train_root(self, X,Y, C,kernel='linear',degree=3, gamma='auto', coef0=0.0, trees_count = 200):
+		#from sklearn import svm
+		#clf_root = svm.LinearSVC(C=C)#OneClassSVM(C=C,kernel=kernel,degree=degree, gamma=gamma, coef0=coef0)
+		#clf_root.fit(X,Y)
+		#self.clf_root = clf_root
+		#from sklearn.tree import DecisionTreeClassifier
+		from sklearn.ensemble import AdaBoostClassifier
+		from sklearn.tree import DecisionTreeClassifier
+		
+		adaboostclf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=2),algorithm='SAMME',n_estimators = trees_count)
+		adaboostclf.fit(X,Y)
+		return adaboostclf
+
+
+	### DEPRECATED ###
+	'''
 	def test_with_show(self, clf_root, image):
 
 		import time
 
-		H = 40
-		W = 100
+		H = self.image_h
+		W = self.image_w
 
 		from PIL import Image, ImageFont, ImageDraw
 		import numpy as np
@@ -137,7 +206,7 @@ class DPM:
 			while  y + H <= origin_image_rescaled.size[1]:
 				x = 0
 				while x + W <= origin_image_rescaled.size[0]:
-					im = np.asarray(origin_image_rescaled.crop((x,y,x+W,y+H)))#(y,x,y+H,x+W)))# X -> Y AAAAA					    
+					im = np.asarray(origin_image_rescaled.crop((x,y,x+W,y+H)))					    
 					hog_feature = hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
 					cl = clf_root.predict([hog_feature])
 
@@ -157,7 +226,8 @@ class DPM:
 			del dr
 
 		self.show_images(images_scales)
-		
+	'''
+	### ###
 	
 
 	#returns detected boxes
@@ -201,52 +271,7 @@ class DPM:
 		return boxes
 
 
-
-	#DEPRECATED
-	def testing(self, clf_root):
-		#TestImages
-		annotations = open('CarData/trueLocations.txt','r')
-
-		from PIL import Image
-
-		truepos = 0
-		falsepos = 0
-
-		delta = 10 #pixels
-
-		founded_obj = 0
-
-		for count in range(0,170):
-			print count
-			objects_raw = annotations.readline().replace('\n','').split(' ')[1:]
-			objects = []
-			for el in objects_raw:
-				height = int(el.replace('(','').replace(')','').split(',')[0])
-				width = int(el.replace('(','').replace(')','').split(',')[1])
-				objects.append([height,width])
-				print el
-
-			input_image = io.imread('CarData/TestImages/test-' + str(count) + '.pgm')
-			im_boxes = test_boxes(clf_root, Image.fromarray(input_image))
-		
-			for box in im_boxes:
-			
-				fp = True
-				for obj in objects:
-					if  obj[0]-delta <= box[0] <= obj[0]+delta and obj[1]-delta <= box[1] <= obj[1]+delta:
-						fp = False
-						break
-				if fp:
-					falsepos += 1
-				else:
-					truepos += 1
-		annotations.close()
-		return truepos, falsepos
-
-
-	def testing_train(self, clf_root, X, Y):
-		#TestImages
-		#annotations = open('CarData/trueLocations.txt','r')
+	def testing_train(self, clf_root, X, Y):#error_rate_train
 
 		from PIL import Image
 
@@ -256,19 +281,19 @@ class DPM:
 		founded_obj = 0
 
 		count = 0
-		for window in X:
-			if clf_root.predict([window])[0] == Y[count]:
+		for window_feature in X:
+			if clf_root.predict([window_feature])[0] == Y[count]:
 				truepos += 1
 			else: 
 				falsepos += 1
 			count += 1
 
-		return truepos, falsepos
+		return 'truepos:',truepos,'falsepos:',falsepos
 
 	
 	
 	
-	def get_XY_test(self):
+	def get_XY_test(self, pix_per_cell = 8, cells_per_bl = 2):
 		annotations = open('CarData/trueLocations.txt','r')
 
 		from PIL import Image
@@ -297,7 +322,7 @@ class DPM:
 				if obj[0] < 0:
 					w = 0
 				im = np.asarray(Image.fromarray(input_image).crop((h,w,h+40,w+100)))					    
-				X_test.append(hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2)))
+				X_test.append(hog(im, orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl)))
 				Y_test.append('1')
 				
 		annotations.close()
@@ -321,27 +346,63 @@ class DPM:
 	    fig.set_size_inches(np.array(fig.get_size_inches()) * n_ims)
 	    plt.show()
 
-	#def score(self,filters 
+
+	# image as 2d-array
+	def ave_image_entropy(self, image, disk_radius = 2):
+		from skimage.filters.rank import entropy
+		from skimage.morphology import disk
+		return sum(map(sum,entropy(image,disk(disk_radius))))/(0.0 + len(image)*len(image[0]))
+
+	# image as PIL Image
+	def parts_of_image(self, image,parts_count = 6):
+
+		if not isinstance(image, Image.Image):
+			raise Exception('Image should be of type PIL.Image')
+
+		max_entropy = 0
+		max_w = 0
+		max_h = 0
+
+		for height in range(0, self.image_h, 1):
+			for width in range(0, self.image_w, 2):
+				im_crop = np.asarray(Image.fromarray(image).crop((width,height,width+part_w,height+part_h)))
 
 
-	def init_part_filters(self):
-		part_w = 20
-		part_h = 10
+
+		part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
+		#should be implemented till the end
+
+
+	def init_part_filters(
+		self, 
+		C = 1, 
+		kernel = 'linear',
+		degree=3, 
+		gamma='auto', 
+		coef0=0.0, 
+		pix_per_cell = 16, 
+		cells_per_bl = 2,
+		pix_per_cell_1 = 4, 
+		cells_per_bl_1 = 2, 
+		trees = 200):
+	
+		part_w = self.part_w #20
+		part_h = self.part_h #10
 
 		parts = []
 		#[w,h] point on image 
 		parts.append([10,35])
 		parts.append([12,55])
-		parts.append([20,75])
+		parts.append([20,65])
 		parts.append([25,60])
 		parts.append([25,15])
 		parts.append([20,5])
+		
+		self.parts = parts
 
 		filters_F = []
 
 		im = io.imread('CarData/TrainImages/pos-0.pgm')
-		#im = np.asarray(origin_image_rescaled.crop((y,x,y+H,x+W)))					    
-		#hog_feature = hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
 		
 		X_with_filters = []
 		Y_with_filters = []
@@ -353,14 +414,14 @@ class DPM:
 
 			feature_vec = []
 
-			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
+			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
 			feature_vec += root_feature.tolist()
 
 
 			for i in range(0,6):
 				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
-		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(4, 4),cells_per_block=(2, 2))
+		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 
 				#filters_el.append(part_hog)
 				feature_vec += part_hog.tolist()
@@ -378,10 +439,12 @@ class DPM:
 				
 				
 			feature_vec_new = []
-			for el in feature_vec:
-				feature_vec_new += (el + 0.0)/np.sqrt(np.dot(el,el))
+			norm = np.sqrt(np.dot(feature_vec,feature_vec))
+			for elem in feature_vec:
+				feature_vec_new += [(elem + 0.0)/norm]
 
 
+			#print '+++', el, len(feature_vec_new)
 			X_with_filters.append(feature_vec_new)
 			Y_with_filters.append('1')
 		
@@ -392,14 +455,14 @@ class DPM:
 
 			feature_vec = []
 
-			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
+			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
 			feature_vec += root_feature.tolist()
 
 
 			for i in range(0,6):
 				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
-		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(4, 4),cells_per_block=(2, 2))
+		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 
 				#filters_el.append(part_hog)
 				feature_vec += part_hog.tolist()
@@ -415,10 +478,14 @@ class DPM:
 				feature_vec += [y_hat**2]
 				
 			feature_vec_new = []
-			for el in feature_vec:
-				feature_vec_new += (el + 0.0)/np.sqrt(np.dot(el,el))
+
+			norm = np.sqrt(np.dot(feature_vec,feature_vec))
+			for elem in feature_vec:
+				
+				feature_vec_new += [(elem + 0.0)/norm]
 
 
+			#print el, '---', len(feature_vec_new)
 			X_with_filters.append(feature_vec_new)
 			Y_with_filters.append('0')
 
@@ -427,10 +494,19 @@ class DPM:
 
 
 
-		return self.train_root(X_with_filters,Y_with_filters,1)
+		return self.train_root(X_with_filters,Y_with_filters,C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=coef0, trees_count = trees)
 			
 			
-	def find_car_filters(self,clf,im, parts):
+	def find_car_filters(
+		self, 
+		clf,
+		im, 
+		parts,
+		pix_per_cell = 8, 
+		cells_per_bl = 2,
+		pix_per_cell_1 = 8, 
+		cells_per_bl_1 = 2, 
+		):
 		import time
 
 		H = 40
@@ -466,12 +542,12 @@ class DPM:
 				while x + W <= origin_image_rescaled.size[0]:
 					im = np.asarray(origin_image_rescaled.crop((x,y,x+W,y+H)))#(y,x,y+H,x+W)))# X -> Y AAAAA
 					feature_vec = []					    
-					hog_feature = hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
+					hog_feature = hog(im, orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
 					feature_vec = hog_feature.tolist()
 					for i in range(0,6):
-						part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
-		 				part_hog = hog(part_F, orientations=9, pixels_per_cell=(4, 4),cells_per_block=(2, 2))
+						part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
+		 				part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 						feature_vec += part_hog.tolist()
 					
 					for i in range(0,6):	
@@ -489,8 +565,8 @@ class DPM:
 					if cl[0] == '1':
 						dr.rectangle(((x,y),(x+W,y+H)), fill = None, outline = None)
 		
-					x += step_x
-				y = y + step_y
+					x += self.step_x
+				y = y + self.step_y
 
 
 			images_scales.append(np.asarray(origin_image_rescaled))
@@ -505,8 +581,11 @@ class DPM:
 
 		
 	#test trash 
-	def new_test_train(self, clf):
+	def new_test_train(self, clf, pix_per_cell = 8, cells_per_bl = 2,pix_per_cell_1 = 4, cells_per_bl_1 = 2):
 		tp = 0;
+
+		#refactor
+		parts = self.parts
 
 		scores_pos = []
 		for el in range(0,550):
@@ -515,14 +594,14 @@ class DPM:
 
 			feature_vec = []
 
-			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
+			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell,pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
 			feature_vec += root_feature.tolist()
 
 
 			for i in range(0,6):
-				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
-		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(4, 4),cells_per_block=(2, 2))
+				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
+		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 
 				#filters_el.append(part_hog)
 				feature_vec += part_hog.tolist()
@@ -537,10 +616,9 @@ class DPM:
 				feature_vec += [x_hat**2]
 				feature_vec += [y_hat**2]
 				
-				
-				
-			score = np.dot(clf.coef_,feature_vec)
-			scores_pos.append(score)
+			#commented for AdaBoost
+			#score = np.dot(clf.coef_[0],feature_vec)
+			#scores_pos.append(score)
 			if clf.predict([feature_vec]) == '1':
 				tp += 1
 		
@@ -553,16 +631,15 @@ class DPM:
 
 			feature_vec = []
 
-			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
+			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
 			feature_vec += root_feature.tolist()
 
 
 			for i in range(0,6):
-				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
-		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(4, 4),cells_per_block=(2, 2))
+				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
+		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 
-				#filters_el.append(part_hog)
 				feature_vec += part_hog.tolist()
 			
 
@@ -574,12 +651,12 @@ class DPM:
 				feature_vec += [y_hat]
 				feature_vec += [x_hat**2]
 				feature_vec += [y_hat**2]
-				
-			score = np.dot(clf.coef_,feature_vec)
-			scores_neg.append(score)
+
+			#score = np.dot(clf.coef_[0],feature_vec)
+			#scores_neg.append(score)
 			if clf.predict([feature_vec]) == '0':
 				tp += 1
-		return scores_pos,scores_neg#,tp, tp/(0.0 + 1050)
+		return tp, tp/(0.0 + 1050)#scores_pos,scores_neg,
 
 
 
@@ -589,10 +666,12 @@ class DPM:
 
 
 	#another trash, delete
-	def get_new_test(self,clf,parts):
+	def get_new_test(self,clf,pix_per_cell = 8, cells_per_bl = 2,pix_per_cell_1 = 4, cells_per_bl_1 = 2):
 		annotations = open('CarData/trueLocations.txt','r')
 
 		from PIL import Image
+
+		parts = self.parts
 
 		X_test = []
 		Y_test = []
@@ -622,19 +701,16 @@ class DPM:
 				if obj[0] < 0:
 					w = 0
 				im = np.asarray(Image.fromarray(input_image).crop((w,h,w+100,h+40)))					    
-				root_feature = hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
+				root_feature = hog(im, orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
 				feature_vec = []
-
-				#root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
-
 				feature_vec += root_feature.tolist()
 
 
 				for i in range(0,6):
 					#parts in clojure
-					part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
-			 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(4, 4),cells_per_block=(2, 2))
+					part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
+			 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 
 					#filters_el.append(part_hog)
 					feature_vec += part_hog.tolist()
@@ -651,6 +727,12 @@ class DPM:
 				
 				
 				
+				#REMOVE NORMALIZATION
+				feature_vec_new = []
+				norm = np.sqrt(np.dot(feature_vec,feature_vec))
+				for elem in feature_vec:
+					feature_vec_new += [(elem + 0.0/norm)]
+				
 				#score = np.dot(clf.coef_,feature_vec)
 				#scores_pos.append(score)
 				if clf.predict([feature_vec]) == '1':
@@ -660,6 +742,30 @@ class DPM:
 		return (tp+0.0)/all_obj
 
 
-	#def coord_transform(self, x0,y0, xi,yi, vi, si):# vi =  smth (_,_)
-	#	return (xi,yi) - 2*(x0,y0) + vi)/si
+	def configurate(self):
+		for pix_per_c in [8,16]:
+			for cell_p_block in [2,4]:
+				for pix_per_c_1 in [8]:#[4,8]:
+					for cell_p_block_1 in [2]:
+						test_score_prev = 2
+						test_score_curr = 0
+
+						for trees_count in range(300,801, 100):
+							if cell_p_block == 2 and pix_per_c==4 :
+								continue
+
+							print '# Test', 'pix_per_cell:', pix_per_c, 'cell_per_block:', cell_p_block, 'pix_per_cell_1:', pix_per_c_1, 'cell_per_block_1:', cell_p_block_1, 'trees_count:', trees_count
+
+							adaboost = self.init_part_filters(pix_per_cell = pix_per_c, cells_per_bl = cell_p_block,pix_per_cell_1 = pix_per_c_1, cells_per_bl_1 = cell_p_block_1, trees = trees_count)
+
+							print 'train errors:', self.new_test_train(adaboost, pix_per_cell = pix_per_c, cells_per_bl = cell_p_block,pix_per_cell_1 = pix_per_c_1, cells_per_bl_1 = cell_p_block_1)
+
+							test_score_curr = self.get_new_test(adaboost,pix_per_cell = pix_per_c, cells_per_bl = cell_p_block,pix_per_cell_1 = pix_per_c_1, cells_per_bl_1 = cell_p_block_1)
+
+							#if test_score_curr < test_score_prev:
+							print 'test errors:', test_score_curr
+							#test_score_prev = test_score_curr
+							#else:
+							#	break
+
 
