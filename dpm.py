@@ -9,49 +9,87 @@ from PIL import Image
 
 from skimage import io
 
+from PIL import Image
+
 
 
 '''
 plans -> 7 adaboosts with changed distance of partfilters
 '''
 
-class PartFilter:
-	"""Here F is a part filter(HOG), v is a two-dimensional vector specifying the center for
-a box of possible positions for part relative to the root position,
-s gives the size of this box, while ai and bi are twodimensional
-vectors specifying coefficients of a quadratic
-function measuring a score for each possible placement of
-the part.   """
-	def __init__(self,F,v,s,a,b):
-		self.F = F
-		self.v = v
-		self.s = s
-		self.a = a
-		self.b = b
-	
+# class PartFilter:
+# 	"""
+# 	CHANGE OR DELETE
+
+# 	Here F is a part filter(HOG), v is a two-dimensional vector specifying the center for
+# a box of possible positions for part relative to the root position,
+# s gives the size of this box, while ai and bi are twodimensional
+# vectors specifying coefficients of a quadratic
+# function measuring a score for each possible placement of
+# the part.   """
+# 	def __init__(self, x_coord, y_coord, width, height):
+# 		self.x_coord = x_coord
+# 		self.y_coord = y_coord
+# 		self.width = width
+# 		self.height = height
+
+
+# 	def train_part(dpm, trees_count):
+# 		from sklearn.ensemble import AdaBoostClassifier
+# 		from sklearn.tree import DecisionTreeClassifier
+
+# 		X_part = []
+# 		Y_part = []
+
+# 		for im in self.train_images_pos:
+
+# 			im = np.asarray(im.crop((self.x_coord,self.y_coord,self.x_coord+self.width,self.y_coord+self.height)))					    
+# 			X_part.append(hog(im, orientations=9, pixels_per_cell=(dpm.pix_per_cell, dpm.pix_per_cell),cells_per_block=(dpm.cells_per_bl, dpm.cells_per_bl)))
+# 			Y_part.append('1')
+
+# 		for im in self.train_images_neg:
+
+# 			im = np.asarray(im.crop((self.x_coord,self.y_coord,self.x_coord+self.width,self.y_coord+self.height)))					    
+# 			X_test.append(hog(im, orientations=9, pixels_per_cell=(dpm.pix_per_cell, dpm.pix_per_cell),cells_per_block=(dpm.cells_per_bl, dpm.cells_per_bl)))
+# 			Y_test.append('0')
+
+
+# 		adaboostclf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=2),algorithm='SAMME', n_estimators = trees_count)
+# 		adaboostclf.fit(X_part,Y_part)
+		
+# 		self.adaclf = adaboostclf
 
 class DPM:
 	
 	image_h = 40
 	image_w = 100
 
-	step_x = 4
-	step_y = 2
+	# step_x = 4
+	# step_y = 2
 	
-	#HOG configuration
-	pix_per_cell_root = 8
-	cells_per_block_root = 2
+	# #HOG configuration
+	# pix_per_cell_root = 8
+	# cells_per_block_root = 2
 	
-	pix_per_cell_part_part = 4
-	cells_per_block_part = 2
+	# pix_per_cell_part_part = 8
+	# cells_per_block_part = 2
 
-	# our partfilters
-	parts = []
+	# # our partfilters
+	# parts = []
 
 	
-	# partfilter size
-	part_w = 30
-	part_h = 20
+	# # partfilter size
+	# part_w = 30
+	# part_h = 20
+
+	# # train hog features
+	# X = []
+	# Y = []
+
+	# # train images
+	# train_images_pos = []
+	# train_images_neg = [] 
+
 
 	def __init__(
 		self, 
@@ -106,23 +144,10 @@ class DPM:
 		self.train_images_neg = train_images_neg
 
 		return train_images_pos, train_images_neg
-		
-
-		#TRAIN ROOT-FILTER 
-		#scikit-learn svm with --sliding windows
-
 
 	def get_training_XY(self, positive_im, negative_im, pix_per_cell = 8, cells_per_bl = 2, is_svm = False):
 		X = []
 		Y = []
-	
-		#window is strictly given for now
-		H = 100
-		W = 40
-
-		from PIL import Image
-		#from skimage.transform import resize
-		import numpy as np
 
 		#Positive
 		for i in range(0,500):
@@ -145,11 +170,11 @@ class DPM:
 		
 		self.X = X
 		self.Y = Y
-		self.X_norm = []
-		if is_svm:
-			for el in X:
-				self.X_norm.append(el/(0.0 + np.sqrt(np.dot(el,el))))
-			return X_norm, Y
+		# self.X_norm = []
+		# if is_svm:
+		# 	for el in X:
+		# 		self.X_norm.append(el/(0.0 + np.sqrt(np.dot(el,el))))
+		# 	return X_norm, Y
 		return X,Y	
 
 
@@ -169,65 +194,22 @@ class DPM:
 		return adaboostclf
 
 
-	### DEPRECATED ###
-	'''
-	def test_with_show(self, clf_root, image):
 
-		import time
+	def image_mag(self, image):
 
-		H = self.image_h
-		W = self.image_w
+		import numpy
+		import scipy
+		from scipy import ndimage
 
-		from PIL import Image, ImageFont, ImageDraw
-		import numpy as np
-		import pylab
-		from skimage import transform
-	
-		# try to detect in different scales
-		rescale_coeff = 1
+		img = numpy.asarray(image)
 
-		coeff = 1.0/2
-
-		origin_image = Image.fromarray(np.copy(np.asarray(image)))
-
-		images_scales = []
-	
-		while int(origin_image.size[1]*rescale_coeff) >= H and int(origin_image.size[0]*rescale_coeff) >= W:
-
-			start = time.time()	
-			origin_image_rescaled = Image.fromarray(transform.rescale(np.asarray(origin_image),rescale_coeff))
-			dr = ImageDraw.Draw(origin_image_rescaled)
+		im = img.astype('int32')
+		dx = ndimage.sobel(im, 1)  # horizontal derivative
+		dy = ndimage.sobel(im, 0)  # vertical derivative
+		mag = numpy.hypot(dx, dy)  # magnitude
+		#mag *= 255.0 / numpy.max(mag)  # normalize (Q&D)
 		
-		
-
-			x = 0
-			y = 0
-
-			while  y + H <= origin_image_rescaled.size[1]:
-				x = 0
-				while x + W <= origin_image_rescaled.size[0]:
-					im = np.asarray(origin_image_rescaled.crop((x,y,x+W,y+H)))					    
-					hog_feature = hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
-					cl = clf_root.predict([hog_feature])
-
-					if cl[0] == '1':
-						dr.rectangle(((x,y),(x+W,y+H)), fill = None, outline = None)
-		
-					x += step_x
-				y = y + step_y
-
-
-			images_scales.append(np.asarray(origin_image_rescaled))
-	
-			end = time.time()
-			print end - start
-		
-			rescale_coeff *= coeff
-			del dr
-
-		self.show_images(images_scales)
-	'''
-	### ###
+		return sum(sum(mag))
 	
 
 	#returns detected boxes
@@ -328,49 +310,92 @@ class DPM:
 		annotations.close()
 		return X_test, Y_test
 
-
-
 	def show_images(self, images,titles=None):
-	    #Display a list of images
-	    n_ims = len(images)
-	    if titles is None: titles = ['(%d)' % i for i in range(1,n_ims + 1)]
-	    fig = plt.figure()
-	    n = 1
-	    for image,title in zip(images,titles):
-		a = fig.add_subplot(1,n_ims,n) # Make subplot
-		#if image.ndim == 2: # Is image grayscale?
-		#    plt.gray() # Only place in this blog you can't replace 'gray' with 'grey'
-		plt.imshow(image)
-		a.set_title(title)
-		n += 1
-	    fig.set_size_inches(np.array(fig.get_size_inches()) * n_ims)
-	    plt.show()
+		import matplotlib.pyplot as plt
+	
+		#Display a list of images
+		n_ims = len(images)
+		if titles is None: titles = ['(%d)' % i for i in range(1,n_ims + 1)]
+		fig = plt.figure()
+		n = 1
+		for image,title in zip(images,titles):
+			a = fig.add_subplot(1,n_ims,n) # Make subplot
+			#if image.ndim == 2: # Is image grayscale?
+			#    plt.gray() # Only place in this blog you can't replace 'gray' with 'grey'
+			plt.imshow(image)
+			a.set_title(title)
+			n += 1
+		fig.set_size_inches(np.array(fig.get_size_inches()) * n_ims)
+		plt.show()
 
 
 	# image as 2d-array
-	def ave_image_entropy(self, image, disk_radius = 2):
-		from skimage.filters.rank import entropy
-		from skimage.morphology import disk
-		return sum(map(sum,entropy(image,disk(disk_radius))))/(0.0 + len(image)*len(image[0]))
+	# def ave_image_entropy(self, image, disk_radius = 2):
+	# 	from skimage.filters.rank import entropy
+	# 	from skimage.morphology import disk
+	# 	return sum(map(sum,entropy(image,disk(disk_radius))))/(0.0 + len(image)*len(image[0]))
+
+
+	def set_black_rectangle(self, image, max_w, max_h, part_w, part_h):
+		im = image.copy()
+		im = np.asarray(im)
+		im.flags.writeable = True
+		for j in range(max_w, max_w + part_w):
+			for i in range(max_h, max_h + part_h):
+				im[i][j] = 0
+		return Image.fromarray(im)
+
 
 	# image as PIL Image
 	def parts_of_image(self, image,parts_count = 6):
 
+		from PIL import ImageDraw
+
 		if not isinstance(image, Image.Image):
 			raise Exception('Image should be of type PIL.Image')
 
-		max_entropy = 0
-		max_w = 0
-		max_h = 0
+		res_parts = []
 
-		for height in range(0, self.image_h, 1):
-			for width in range(0, self.image_w, 2):
-				im_crop = np.asarray(Image.fromarray(image).crop((width,height,width+part_w,height+part_h)))
+		i = 0
+
+		while i < parts_count:
+
+			#self.show_images([image])
+			max_mag = 0
+			max_w = 0
+			max_h = 0
+
+
+			# TODO REFACTOR height and width ->> y and x (point)
+			for height in range(0, self.image_h - self.part_h, 1):
+				for width in range(0, self.image_w - self.part_w, 2):
+					im_crop = np.array(image.crop((width,height,width+self.part_w,height+self.part_h)))
+					im_mag = self.image_mag(im_crop)
+					
+					if [width,height] in res_parts :
+						continue
+					if max_mag < im_mag:
+						max_mag = im_mag
+						max_w = width
+						max_h = height
+
+			draw = ImageDraw.Draw(image)
+			draw.rectangle([max_w, max_h,self.part_w,self.part_h], fill=0)
+			del draw
+
+			#self.show_images([image])
+			res_parts.append([max_w,max_h])
+			print '[',max_w,',',max_h,'] - ',max_mag
 
 
 
-		part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
-		#should be implemented till the end
+			#image = self.set_black_rectangle(image, max_w, max_h, self.part_w, self.part_h)
+			i += 1
+
+		self.show_images([image])
+		return res_parts
+
+
 
 
 	def init_part_filters(
@@ -380,7 +405,7 @@ class DPM:
 		degree=3, 
 		gamma='auto', 
 		coef0=0.0, 
-		pix_per_cell = 16, 
+		pix_per_cell = 8, 
 		cells_per_bl = 2,
 		pix_per_cell_1 = 4, 
 		cells_per_bl_1 = 2, 
@@ -402,7 +427,7 @@ class DPM:
 
 		filters_F = []
 
-		im = io.imread('CarData/TrainImages/pos-0.pgm')
+		# im = io.imread('CarData/TrainImages/pos-0.pgm')
 		
 		X_with_filters = []
 		Y_with_filters = []
