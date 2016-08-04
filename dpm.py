@@ -3,6 +3,8 @@ from skimage import data, color, exposure, transform
 
 import matplotlib.pyplot as plt
 
+import cv2
+
 import numpy as np
 
 from PIL import Image
@@ -16,48 +18,6 @@ from PIL import Image
 '''
 plans -> 7 adaboosts with changed distance of partfilters
 '''
-
-# class PartFilter:
-# 	"""
-# 	CHANGE OR DELETE
-
-# 	Here F is a part filter(HOG), v is a two-dimensional vector specifying the center for
-# a box of possible positions for part relative to the root position,
-# s gives the size of this box, while ai and bi are twodimensional
-# vectors specifying coefficients of a quadratic
-# function measuring a score for each possible placement of
-# the part.   """
-# 	def __init__(self, x_coord, y_coord, width, height):
-# 		self.x_coord = x_coord
-# 		self.y_coord = y_coord
-# 		self.width = width
-# 		self.height = height
-
-
-# 	def train_part(dpm, trees_count):
-# 		from sklearn.ensemble import AdaBoostClassifier
-# 		from sklearn.tree import DecisionTreeClassifier
-
-# 		X_part = []
-# 		Y_part = []
-
-# 		for im in self.train_images_pos:
-
-# 			im = np.asarray(im.crop((self.x_coord,self.y_coord,self.x_coord+self.width,self.y_coord+self.height)))					    
-# 			X_part.append(hog(im, orientations=9, pixels_per_cell=(dpm.pix_per_cell, dpm.pix_per_cell),cells_per_block=(dpm.cells_per_bl, dpm.cells_per_bl)))
-# 			Y_part.append('1')
-
-# 		for im in self.train_images_neg:
-
-# 			im = np.asarray(im.crop((self.x_coord,self.y_coord,self.x_coord+self.width,self.y_coord+self.height)))					    
-# 			X_test.append(hog(im, orientations=9, pixels_per_cell=(dpm.pix_per_cell, dpm.pix_per_cell),cells_per_block=(dpm.cells_per_bl, dpm.cells_per_bl)))
-# 			Y_test.append('0')
-
-
-# 		adaboostclf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=2),algorithm='SAMME', n_estimators = trees_count)
-# 		adaboostclf.fit(X_part,Y_part)
-		
-# 		self.adaclf = adaboostclf
 
 class DPM:
 	
@@ -193,66 +153,6 @@ class DPM:
 		adaboostclf.fit(X,Y)
 		return adaboostclf
 
-
-
-	def image_mag(self, image):
-
-		import numpy
-		import scipy
-		from scipy import ndimage
-
-		img = numpy.asarray(image)
-
-		im = img.astype('int32')
-		dx = ndimage.sobel(im, 1)  # horizontal derivative
-		dy = ndimage.sobel(im, 0)  # vertical derivative
-		mag = numpy.hypot(dx, dy)  # magnitude
-		#mag *= 255.0 / numpy.max(mag)  # normalize (Q&D)
-		
-		return sum(sum(mag))
-	
-
-	#returns detected boxes
-	def test_boxes(self, clf_root, image):
-
-		H = 40
-		W = 100
-
-		boxes = []
-
-		from PIL import Image, ImageFont, ImageDraw
-		import numpy as np
-		import pylab
-		from skimage import transform
-	
-		rescale_coeff = 1
-
-		coeff = 2.0/3
-
-		while int(image.size[1]*rescale_coeff) >= H and int(image.size[0]*rescale_coeff) >= W:
-		
-			image = Image.fromarray(transform.rescale(np.asarray(image),rescale_coeff))
-
-			x = 0
-			y = 0
-
-			while  y + H <= image.size[1]:
-				x = 0
-				while x + W <= image.size[0]:
-					im = np.asarray(image.crop((x,y,x+W,y+H)))#(y,x,y+H,x+W)))# X -> Y AAAAA							    
-					hog_feature = hog(im, orientations=9, pixels_per_cell=(8, 8),cells_per_block=(2, 2))
-					cl = clf_root.predict([hog_feature])
-
-					if cl[0] == '1':
-						boxes.append((x,y))
-		
-					x += step_x
-				y = y + step_y
-
-			rescale_coeff *= coeff
-		return boxes
-
-
 	def testing_train(self, clf_root, X, Y):#error_rate_train
 
 		from PIL import Image
@@ -327,75 +227,109 @@ class DPM:
 			n += 1
 		fig.set_size_inches(np.array(fig.get_size_inches()) * n_ims)
 		plt.show()
+	
+	def image_mag(self, img):
+
+		import numpy
+		import scipy
+		from scipy import ndimage
+
+		im = img.astype('int32')
+		dx = ndimage.sobel(im, 1)  # horizontal derivative
+		dy = ndimage.sobel(im, 0)  # vertical derivative
+		mag = numpy.hypot(dx, dy)  # magnitude
+		#mag *= 255.0 / numpy.max(mag)  # normalize (Q&D)
+		
+		return mag
+
+	def image_fragment_mag(self,mag_map,rect):
+		im_mag = mag_map[rect[0]: rect[0] + rect[2],rect[1]:rect[1] + rect[3]].copy()
+
+		return sum(sum(im_mag))
+
+	def zero_mag_map(self,mag_map,rect):
+		mag_map[rect[0]: rect[0] + rect[2],rect[1]:rect[1] + rect[3]] = 0
 
 
-	# image as 2d-array
-	# def ave_image_entropy(self, image, disk_radius = 2):
-	# 	from skimage.filters.rank import entropy
-	# 	from skimage.morphology import disk
-	# 	return sum(map(sum,entropy(image,disk(disk_radius))))/(0.0 + len(image)*len(image[0]))
-
-
-	def set_black_rectangle(self, image, max_w, max_h, part_w, part_h):
-		im = image.copy()
-		im = np.asarray(im)
-		im.flags.writeable = True
-		for j in range(max_w, max_w + part_w):
-			for i in range(max_h, max_h + part_h):
-				im[i][j] = 0
-		return Image.fromarray(im)
-
-
-	# image as PIL Image
-	def parts_of_image(self, image,parts_count = 6):
+	def parts_of_image(self, im,parts_count = 6):
 
 		from PIL import ImageDraw
 
-		if not isinstance(image, Image.Image):
-			raise Exception('Image should be of type PIL.Image')
+		from PIL import Image
+		# if not isinstance(image, Image.Image):
+			# raise Exception('Image should be of type PIL.Image')
 
 		res_parts = []
 
 		i = 0
 
+
+		mag_map = self.image_mag(im)
 		while i < parts_count:
 
 			#self.show_images([image])
 			max_mag = 0
-			max_w = 0
-			max_h = 0
+			max_x = 0
+			max_y = 0
 
-
-			# TODO REFACTOR height and width ->> y and x (point)
-			for height in range(0, self.image_h - self.part_h, 1):
-				for width in range(0, self.image_w - self.part_w, 2):
-					im_crop = np.array(image.crop((width,height,width+self.part_w,height+self.part_h)))
-					im_mag = self.image_mag(im_crop)
+			#self.part_h = 20
+			#self.part_w = 30 
+			for y in range(0, im.shape[0] - self.part_h, 1):
+				for x in range(0, im.shape[1] - self.part_w, 2):
+					#im_crop = im[y:y+self.part_h,x:x+self.part_w]
+					im_mag = self.image_fragment_mag(mag_map,(y,x,self.part_h,self.part_w))#self.image_mag(im_crop,res_parts)
 					
-					if [width,height] in res_parts :
-						continue
-					if max_mag < im_mag:
-						max_mag = im_mag
-						max_w = width
-						max_h = height
+					#print 'im_mag ', im_mag
+					#print 'mag_map ', sum(sum(mag_map))
 
-			draw = ImageDraw.Draw(image)
-			draw.rectangle([max_w, max_h,self.part_w,self.part_h], fill=0)
-			del draw
+					if [y,x] in res_parts :
+						continue
+					else:
+						if max_mag < im_mag:
+							max_mag = im_mag
+							max_x = x
+							max_y = y
+
+			# draw = ImageDraw.Draw(Image.fromarray(im))
+			# draw.rectangle([max_x, max_y,self.part_w,self.part_h], fill=0)
+			# del draw
+
 
 			#self.show_images([image])
-			res_parts.append([max_w,max_h])
-			print '[',max_w,',',max_h,'] - ',max_mag
+			self.zero_mag_map(mag_map,(max_y,max_x,self.part_h,self.part_w))
+			res_parts.append([max_y,max_x])
+			#if i == 2:
+			im[res_parts[i][0] : res_parts[i][0] + self.part_h, res_parts[i][1] : res_parts[i][1] + self.part_w] = 255
+			cv2.imshow(str(i),im)
+			cv2.waitKey(0)
+			print '[',max_y,',',max_x,'] - ', max_mag
 
 
 
-			#image = self.set_black_rectangle(image, max_w, max_h, self.part_w, self.part_h)
+			#cv2.GaussianBlur(im[res_parts[i][0]:res_parts[i][0] + self.part_w,res_parts[i][1]:res_parts[i][0] + self.part_h],(5,5),5,5)
+			#cv2.imshow('aa',im)
+			#cv2.waitKey(0)
 			i += 1
 
-		self.show_images([image])
+		self.show_images([im])
 		return res_parts
 
 
+
+	def collect_pathes_from_train(self, path):
+		import os
+
+		path = '/home/al-at-pc/Documents/Projects/ML/ComputerVision/Car_Detection/CarData/TrainImages'
+		
+		im_names = os.listdir(path)
+
+		im_parts = []
+
+		for name in im_names:
+			print name
+			im_parts.append(self.parts_of_image(cv2.imread('/home/al-at-pc/Documents/Projects/ML/ComputerVision/Car_Detection/CarData/TrainImages/pos-1.pgm',0)))
+
+		return im_parts
 
 
 	def init_part_filters(
@@ -515,7 +449,6 @@ class DPM:
 			Y_with_filters.append('0')
 
 			
-
 
 
 
@@ -765,32 +698,5 @@ class DPM:
 				
 		annotations.close()
 		return (tp+0.0)/all_obj
-
-
-	def configurate(self):
-		for pix_per_c in [8,16]:
-			for cell_p_block in [2,4]:
-				for pix_per_c_1 in [8]:#[4,8]:
-					for cell_p_block_1 in [2]:
-						test_score_prev = 2
-						test_score_curr = 0
-
-						for trees_count in range(300,801, 100):
-							if cell_p_block == 2 and pix_per_c==4 :
-								continue
-
-							print '# Test', 'pix_per_cell:', pix_per_c, 'cell_per_block:', cell_p_block, 'pix_per_cell_1:', pix_per_c_1, 'cell_per_block_1:', cell_p_block_1, 'trees_count:', trees_count
-
-							adaboost = self.init_part_filters(pix_per_cell = pix_per_c, cells_per_bl = cell_p_block,pix_per_cell_1 = pix_per_c_1, cells_per_bl_1 = cell_p_block_1, trees = trees_count)
-
-							print 'train errors:', self.new_test_train(adaboost, pix_per_cell = pix_per_c, cells_per_bl = cell_p_block,pix_per_cell_1 = pix_per_c_1, cells_per_bl_1 = cell_p_block_1)
-
-							test_score_curr = self.get_new_test(adaboost,pix_per_cell = pix_per_c, cells_per_bl = cell_p_block,pix_per_cell_1 = pix_per_c_1, cells_per_bl_1 = cell_p_block_1)
-
-							#if test_score_curr < test_score_prev:
-							print 'test errors:', test_score_curr
-							#test_score_prev = test_score_curr
-							#else:
-							#	break
 
 
