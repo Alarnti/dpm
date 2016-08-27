@@ -13,6 +13,8 @@ from skimage import io
 
 from PIL import Image
 
+import random
+
 
 class DPM:
 	
@@ -275,6 +277,7 @@ class DPM:
 				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
 		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 
+		 		cv2.imwrite('pos/' + str(nmb) + '/' + str(random.random()) + '.jpg',part_F)
 		 		#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
 		 		filters7[nmb].append(part_hog)
 		 		answers7[nmb].append('1')
@@ -329,6 +332,7 @@ class DPM:
 				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
 		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 
+		 		cv2.imwrite('neg/' + str(nmb) + '/' + str(random.random()) +  '.jpg',part_F)
 		 		#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
 		 		filters7[nmb].append(part_hog)
 				answers7[nmb].append('0')
@@ -370,6 +374,9 @@ class DPM:
 			adaboosts7[key] = self.train_root(filters7[key],answers7[key],C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=coef0, trees_count = trees)
 			
 
+		self.clfs = adaboosts7
+
+		print 'train is over'
 
 		return adaboosts7
 
@@ -605,9 +612,59 @@ class DPM:
 		return (tp+0.0)/all_obj
 
 
+	def process_filter_image(self,clf, im):
+		y = 0
+		x = 0
 
-	def process_image(self,im, clfs):
+
+		pix_per_cell = 8 
+		cells_per_bl = 2 
+		pix_per_cell_1 = 4 
+		cells_per_bl_1 = 2
+
+		height = len(im)
+		width = len(im[0])
+
+		max_prob = 0
+		max_coord_point = (0,0)
+
+		while y in range(0,height - self.part_h):
+			x = 0
+			while x in range(0,width - self.part_w):
+
+				patch_F = im[y:y+self.part_h,x:x+self.part_w]
+				patch_hog = hog(patch_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
+				#print res
+
+				probs = clf.predict_proba([patch_hog])
+
+				#print probs[0][1]
+				#print clf.classes_
+				if probs[0][1] > max_prob:
+					max_coord_point = (y,x)
+					max_prob = probs[0][1]
+
+				x += self.step_x
+
+			y += self.step_y
+
+
+		return max_coord_point
+	
+
+	def get_filters_cost(self, best_coord, filters_nmb):
+
+		#Euclidean
+		return np.sqrt((self.parts[filters_nmb - 1][0] - best_coord[0])**2 + (self.parts[filters_nmb - 1][1] - best_coord[1])**2)
+
+
+
+
+
+	def process_frame(self,im, clfs):
 		nmb = 0
+
+		summ_cost = 0
 
 		pix_per_cell = 8 
 		cells_per_bl = 2 
@@ -616,28 +673,71 @@ class DPM:
 
 		root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
-		answers = []
 
-		answers += [clfs[nmb].predict([root_feature]) == '1']
+
+		if clfs[nmb].predict([root_feature]) == '1':
+			summ_cost += 0.2	
 
 		nmb += 1
 
 		for i in range(0,6):
-			part_F = np.asarray(Image.fromarray(im).crop((self.parts[i][1],self.parts[i][0],self.parts[i][1]+self.part_w,self.parts[i][0]+self.part_h)))
 
-			cv2.imwrite('parts/' + str(i) + '.jpg', part_F)
+			print 'filter:',i
+			best_coord = self.process_filter_image(clfs[nmb],im)
 
-		 	part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
+			filter_cost = self.get_filters_cost(best_coord,nmb)
 
-	 		#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
-		 	answers += [clfs[nmb].predict([part_hog]) == '1']
+			summ_cost += 1.0/filter_cost
+
+			#part_F = np.asarray(Image.fromarray(im).crop((self.parts[i][1],self.parts[i][0],self.parts[i][1]+self.part_w,self.parts[i][0]+self.part_h)))
+
+			# cv2.imwrite('parts/' + str(i) + '.jpg', part_F)
+
+		 # 	part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
+
+		 	#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
+		 # 	answers += [clfs[nmb].predict([part_hog]) == '1']
 		 	nmb += 1
 
-		cnt = 0
-		for el in answers:
-			if el:
-				cnt += 1
 
-		return cnt
+		if summ_cost > 1:
+			return True
+		else:
+			return False
+		# cnt = 0
+		# for el in answers:
+		# 	if el:
+		# 		cnt += 1
 
+		#return cnt
+
+
+
+	def process_image(self, image):	
+
+		print 'process image'
+
+		height = len(image)
+		width = len(image[0])
+
+		im_result = image.copy()
+
+		#TODO resize
+
+		y = 0
+		x = 0
+		while y in range(0,height - self.image_h):
+			x = 0
+			while x in range(0,width - self.image_w):
+
+				res = self.process_frame(image[y : y + self.image_h,x : x + self.image_w],self.clfs)
+				#print res
+				if res:
+					cv2.rectangle(im_result,(x,y),(x + self.image_w,y + self.image_h),(255),3)
+				x += self.step_x
+
+
+			y += self.step_y
+
+		cv2.imwrite('res.jpg',im_result)
 
