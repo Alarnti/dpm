@@ -180,6 +180,7 @@ class DPM:
 			#self.show_images([image])
 			self.zero_mag_map(mag_map,(max_y,max_x,self.part_h,self.part_w))
 			res_parts.append([max_y,max_x])
+			cv2.imwrite('parts/' + str(i) + '/' + str(random.random()) + '.jpg',im[max_y:max_y+self.part_h,max_x:max_x + self.part_w])
 			#if i == 2:
 			#im[res_parts[i][0] : res_parts[i][0] + self.part_h, res_parts[i][1] : res_parts[i][1] + self.part_w] = 255
 			#cv2.imshow(str(i),im)
@@ -205,19 +206,56 @@ class DPM:
 		
 		im_names = os.listdir(path)
 
+		#im_names.sort()
+
 		im_parts = []
 
 		for name in im_names:
 			#print name
-			im_parts.append(self.parts_of_image(cv2.imread(path + '/' + name,0)))
+
+			image =  cv2.imread(path + '/' + name,0)
+			if name.find('pos') == -1:
+				continue
+			im_parts.append(self.parts_of_image(image))
 
 		return im_parts
 
+	def compute_average(self,parts_):
+
+		result_parts = []
+		for part_i in range(0,6):
+			summ_x = 0.0
+			summ_y = 0.0
+
+			length = 0
+
+			for el in parts_:
+				x = el[part_i][1]
+				y = el[part_i][0]
+
+				if x != 0 and y != 0:
+
+					summ_x += x
+					summ_y += y
+					length += 1
+
+			result_parts.append([summ_y/len(parts_),summ_x/len(parts_)])
+
+
+		print 'result parts:'
+		print result_parts
+		return result_parts
+
+
+
+
 
 	def compute_part_filters(self, path):
-		true_parts = self.collect_pathes_from_train(path)[0]
+		computed_parts = self.collect_pathes_from_train(path)
 
-		return true_parts
+		res =  computed_parts[0]#self.compute_average(computed_parts)
+		print res
+		return res
 
 
 	def init_part_filters(
@@ -253,16 +291,17 @@ class DPM:
 		answers7 = {0:[],1:[],2:[],3:[],4:[],5:[],6:[]}
 		
 
+
 		# REFACTOOOR!
 		for el in range(0,550):
 			nmb = 0
 	
-			im = color.rgb2gray(io.imread('CarData/TrainImages/pos-' + str(el) + '.pgm'))
+			im = cv2.imread('CarData/TrainImages/pos-' + str(el) + '.pgm',0)
 			#filters_el = []
 
 			#feature_vec = []
 
-			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
+			root_feature = hog(im, orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
 			#normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
 			#feature_vec += root_feature.tolist()
@@ -274,7 +313,7 @@ class DPM:
 
 
 			for i in range(0,6):
-				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
+				part_F = im[parts[i][0]: parts[i][0] + part_h, parts[i][1]: parts[i][1] + part_w]
 		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 
 		 		cv2.imwrite('pos/' + str(nmb) + '/' + str(random.random()) + '.jpg',part_F)
@@ -312,24 +351,24 @@ class DPM:
 
 		for el in range(0,500):
 			nmb = 0
-			im = color.rgb2gray(io.imread('CarData/TrainImages/neg-' + str(el) + '.pgm'))
+			im = cv2.imread('CarData/TrainImages/neg-' + str(el) + '.pgm',0)
 			#filters_el = []
 
 			#feature_vec = []
 
-			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
+			root_feature = hog(im, orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
-			normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
+			#normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
 
 			#feature_vec += root_feature.tolist()
 
-			filters7[nmb].append(normed_root_feature)#root_feature.tolist())
+			filters7[nmb].append(root_feature)#root_feature.tolist())
 			answers7[nmb].append('0')
 
 			nmb += 1
 
 			for i in range(0,6):
-				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+part_w,parts[i][0]+part_h)))
+				part_F = im[parts[i][0]:parts[i][0] + part_h,parts[i][1]: parts[i][1] + part_w]
 		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 
 		 		cv2.imwrite('neg/' + str(nmb) + '/' + str(random.random()) +  '.jpg',part_F)
@@ -381,238 +420,9 @@ class DPM:
 		return adaboosts7
 
 		#return self.train_root(X_with_filters,Y_with_filters,C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=coef0, trees_count = trees)
-			
-		
-	def new_test_train(self, clfs, pix_per_cell = 8, cells_per_bl = 2,pix_per_cell_1 = 4, cells_per_bl_1 = 2):
-		print 'testing train'
-
-		tp = 0
-		tf = 0
-
-		#refactor
-		parts = self.parts
-
-		for el in range(0,550):
-			nmb = 0
-	
-			im = color.rgb2gray(io.imread('CarData/TrainImages/pos-' + str(el) + '.pgm'))
-
-			#feature_vec = []
-
-			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell,pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
-
-			#normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
-			#feature_vec += root_feature.tolist()
-
-			answers = []
-
-			answers += [clfs[nmb].predict([root_feature]) == '1']
-			# print clfs[nmb].predict([root_feature.tolist()])
-			# print clfs[nmb].predict([root_feature.tolist()]) == '1'
-
-			nmb += 1
-
-			for i in range(0,6):
-				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
-		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
-
-		 		#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
-		 		answers += [clfs[nmb].predict([part_hog]) == '1']
-		 		# print clfs[nmb].predict([part_hog.tolist()])
-		 		# print clfs[nmb].predict([part_hog.tolist()]) == '1'
-
-		 		nmb += 1
-				#filters_el.append(part_hog)
-				#feature_vec += part_hog.tolist()
-			
-
-			# for i in range(0,6):	
-			# 	x_hat = (parts[i][1] - 2 * 0 + (50 + 0))/100.0
-			# 	y_hat = (parts[i][0] - 2 * 0 + (20 + 0))/40.0
-				
-			# 	feature_vec += [x_hat]
-		 # 		feature_vec += [y_hat]
-			# 	feature_vec += [x_hat**2]
-			# 	feature_vec += [y_hat**2]
-				
-			#commented for AdaBoost
-			#score = np.dot(clf.coef_[0],feature_vec)
-			#scores_pos.append(score)
-			# if clf.predict([feature_vec]) == '1':
-			# 	tp += 1
-
-			#print answers
-			cnt = 0
-			for el in answers:
-				if el:
-					cnt += 1
-			if cnt == 7:
-				tp += 1
-		
-
-		scores_neg = []
-		for el in range(0,500):
-			nmb = 0
-	
-			im = color.rgb2gray(io.imread('CarData/TrainImages/neg-' + str(el) + '.pgm'))
-			#filters_el = []
-
-			#feature_vec = []
-
-			root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
-
-			#feature_vec += root_feature.tolist()
-
-			#normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
-
-			answers = []
-
-			answers += [clfs[nmb].predict([root_feature]) == '0']
-
-			nmb += 1
-
-			for i in range(0,6):
-				part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
-		 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
-
-	 			#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
-		 		answers += [clfs[nmb].predict([part_hog]) == '0']
-		 		nmb += 1
-
-				#feature_vec += part_hog.tolist()
-			
-
-			# for i in range(0,6):	
-			# 	x_hat = (parts[i][1] - 2 * 0 + (50 + 0))/100.0
-			# 	y_hat = (parts[i][0] - 2 * 0 + (20 + 0))/40.0
-				
-			# 	feature_vec += [x_hat]
-			# 	feature_vec += [y_hat]
-			# 	feature_vec += [x_hat**2]
-			# 	feature_vec += [y_hat**2]
 
 
-			# feature_vec_new = []
-			# norm = np.sqrt(np.dot(feature_vec,feature_vec))
-			# for elem in feature_vec:
-			# 	feature_vec_new += [(elem + 0.0/norm)]
-
-			#score = np.dot(clf.coef_[0],feature_vec)
-			#scores_neg.append(score)
-			# if clf.predict([feature_vec_new]) == '0':
-			# 	tp += 1
-
-			cnt = 0
-			for el in answers:
-				if el:
-					cnt += 1
-			if cnt == 7:
-				tf += 1
-
-		return tp, tf, (tp + tf)/(0.0 + 1050)#scores_pos,scores_neg,
-
-	#another trash, delete
-	def get_new_test(self,clfs,pix_per_cell = 8, cells_per_bl = 2,pix_per_cell_1 = 4, cells_per_bl_1 = 2):
-		print 'testing'
-		annotations = open('CarData/trueLocations.txt','r')
-
-		parts = self.parts
-
-		X_test = []
-		Y_test = []
-
-		tp = 0
-		all_obj = 0
-		falsepos = 0
-
-		#scores = []
-
-		for count in range(0,170):
-
-
-			objects_raw = annotations.readline().replace('\n','').split(' ')[1:]
-			objects = []
-			for el in objects_raw:
-				all_obj += 1
-				height = int(el.replace('(','').replace(')','').split(',')[0])
-				width = int(el.replace('(','').replace(')','').split(',')[1])
-				objects.append([height,width])
-
-			input_image = io.imread('CarData/TestImages/test-' + str(count) + '.pgm')
-
-			for obj in objects:
-				nmb = 0
-
-				w = obj[0] # height
-				h = obj[1] # width
-				#if obj[1] < 0:
-				# 	h = 0
-				# if obj[0] < 0:
-				# 	w = 0
-				im = np.asarray(Image.fromarray(input_image).crop((w,h,w+100,h+40))) #im = input_image[y:y + self.part_h,x:x+self.part_w]					    
-				root_feature = hog(im, orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
-
-				cv2.imwrite('tests/' + str(count) + '.jpg',im)	
-				#print root_feature
-				#normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
-				#feature_vec = []
-				#feature_vec += root_feature.tolist()
-
-				answers = []
-
-				answers += [clfs[nmb].predict([root_feature]) == '1']
-
-				nmb += 1
-
-
-				for i in range(0,6):
-					#parts in clojure
-					part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
-			 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
-
-	 				#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
-
-			 		answers += [clfs[nmb].predict([part_hog]) == '1']
-
-					nmb += 1
-
-					#filters_el.append(part_hog)
-					#feature_vec += part_hog.tolist()
-			
-
-				# for i in range(0,6):	
-				# 	x_hat = (parts[i][1] - 2 * 0 + (50 + 0))/100.0
-				# 	y_hat = (parts[i][0] - 2 * 0 + (20 + 0))/40.0
-				
-				# 	feature_vec += [x_hat]
-			 # 		feature_vec += [y_hat]
-				# 	feature_vec += [x_hat**2]
-				# 	feature_vec += [y_hat**2]
-				
-				
-				cnt = 0
-				for el in answers:
-					if el:
-						cnt += 1
-				if cnt > 0:
-					tp += 1
-				
-				#REMOVE NORMALIZATION
-				# feature_vec_new = []
-				# norm = np.sqrt(np.dot(feature_vec,feature_vec))
-				# for elem in feature_vec:
-				# 	feature_vec_new += [(elem + 0.0/norm)]
-				
-				#score = np.dot(clf.coef_,feature_vec)
-				#scores_pos.append(score)
-				# if clf.predict([feature_vec_new]) == '1':
-				# 	tp += 1
-				
-		annotations.close()
-		return (tp+0.0)/all_obj
-
-
-	def process_filter_image(self,clf, im):
+	def process_filter_image(self,im):
 		y = 0
 		x = 0
 
@@ -625,8 +435,8 @@ class DPM:
 		height = len(im)
 		width = len(im[0])
 
-		max_prob = 0
-		max_coord_point = (0,0)
+		max_prob = {1:0,2:0,3:0,4:0,5:0,6:0}
+		max_coord_point = {1:(0,0),2:(0,0),3:(0,0),4:(0,0),5:(0,0),6:(0,0)}
 
 		while y in range(0,height - self.part_h):
 			x = 0
@@ -634,15 +444,19 @@ class DPM:
 
 				patch_F = im[y:y+self.part_h,x:x+self.part_w]
 				patch_hog = hog(patch_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
-				#print res
 
-				probs = clf.predict_proba([patch_hog])
+				for j in range(1,7):
 
-				#print probs[0][1]
-				#print clf.classes_
-				if probs[0][1] > max_prob:
-					max_coord_point = (y,x)
-					max_prob = probs[0][1]
+					probs = self.clfs[j].predict_proba([patch_hog])
+
+					#print probs[0][1]
+					#print clf.classes_
+					if probs[0][1] > max_prob[j]:
+						cv2.imwrite('parts/' + str(j) + '/' + str(random.random()) + '.jpg', patch_F)
+						max_coord_point[j] = (y,x)
+						max_prob[j] = probs[0][1]
+
+
 
 				x += self.step_x
 
@@ -661,7 +475,7 @@ class DPM:
 
 
 
-	def process_frame(self,im, clfs):
+	def process_frame(self,im):
 		nmb = 0
 
 		summ_cost = 0
@@ -675,32 +489,31 @@ class DPM:
 
 
 
-		if clfs[nmb].predict([root_feature]) == '1':
-			summ_cost += 0.2	
+		if self.clfs[nmb].predict([root_feature]) == '1':
+			summ_cost += 0.5	
 
 		nmb += 1
 
-		for i in range(0,6):
+		best_coord = self.process_filter_image(im)
 
-			print 'filter:',i
-			best_coord = self.process_filter_image(clfs[nmb],im)
+		for key in best_coord.keys():
 
-			filter_cost = self.get_filters_cost(best_coord,nmb)
+			filter_cost = self.get_filters_cost(best_coord[key],key)
 
-			summ_cost += 1.0/filter_cost
+			summ_cost += 1.0/(1 + filter_cost)
 
 			#part_F = np.asarray(Image.fromarray(im).crop((self.parts[i][1],self.parts[i][0],self.parts[i][1]+self.part_w,self.parts[i][0]+self.part_h)))
-
-			# cv2.imwrite('parts/' + str(i) + '.jpg', part_F)
 
 		 # 	part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
 
 		 	#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
 		 # 	answers += [clfs[nmb].predict([part_hog]) == '1']
-		 	nmb += 1
+	 	#nmb += 1
 
 
+	 	print 'summ_cost ', summ_cost
 		if summ_cost > 1:
+			print 'car here'
 			return True
 		else:
 			return False
@@ -730,14 +543,220 @@ class DPM:
 			x = 0
 			while x in range(0,width - self.image_w):
 
-				res = self.process_frame(image[y : y + self.image_h,x : x + self.image_w],self.clfs)
+				print y,' ', x
+				res = self.process_frame(image[y : y + self.image_h,x : x + self.image_w])
 				#print res
 				if res:
-					cv2.rectangle(im_result,(x,y),(x + self.image_w,y + self.image_h),(255),3)
-				x += self.step_x
+					cv2.rectangle(im_result,(x,y),(x + self.image_w,y + self.image_h),(255),2)
+				x += self.step_x + 25
 
 
-			y += self.step_y
+			y += self.step_y + 10
 
-		cv2.imwrite('res.jpg',im_result)
+		cv2.imwrite('results_test/' + str(random.random()) + 'res.jpg',im_result)
+
+
+
+	def new_test_train(self, clfs, pix_per_cell = 8, cells_per_bl = 2,pix_per_cell_1 = 4, cells_per_bl_1 = 2):
+		print 'testing train'
+
+		tp = 0
+		tf = 0
+
+		#refactor
+		parts = self.parts
+
+		for el in range(0,550):
+			nmb = 0
+	
+			im = cv2.imread('CarData/TrainImages/pos-' + str(el) + '.pgm',0)
+
+			if self.process_frame(im):
+				tp += 1
+
+			# root_feature = hog(im, orientations=9, pixels_per_cell=(pix_per_cell,pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
+
+			# #normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
+			# #feature_vec += root_feature.tolist()
+
+			# answers = []
+
+			# answers += [clfs[nmb].predict([root_feature]) == '1']
+			# # print clfs[nmb].predict([root_feature.tolist()])
+			# # print clfs[nmb].predict([root_feature.tolist()]) == '1'
+
+			# nmb += 1
+
+			# for i in range(0,6):
+			# 	part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
+		 # 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
+
+		 # 		#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
+		 # 		answers += [clfs[nmb].predict([part_hog]) == '1']
+		 # 		# print clfs[nmb].predict([part_hog.tolist()])
+		 # 		# print clfs[nmb].predict([part_hog.tolist()]) == '1'
+
+		 # 		nmb += 1
+			# 	#filters_el.append(part_hog)
+			# 	#feature_vec += part_hog.tolist()
+			
+
+			# # for i in range(0,6):	
+			# # 	x_hat = (parts[i][1] - 2 * 0 + (50 + 0))/100.0
+			# # 	y_hat = (parts[i][0] - 2 * 0 + (20 + 0))/40.0
+				
+			# # 	feature_vec += [x_hat]
+		 # # 		feature_vec += [y_hat]
+			# # 	feature_vec += [x_hat**2]
+			# # 	feature_vec += [y_hat**2]
+				
+			# #commented for AdaBoost
+			# #score = np.dot(clf.coef_[0],feature_vec)
+			# #scores_pos.append(score)
+			# # if clf.predict([feature_vec]) == '1':
+			# # 	tp += 1
+
+			# #print answers
+			# cnt = 0
+			# for el in answers:
+			# 	if el:
+			# 		cnt += 1
+			# if cnt == 7:
+			# 	tp += 1
+		
+
+		scores_neg = []
+		for el in range(0,500):
+			nmb = 0
+	
+			im = cv2.imread('CarData/TrainImages/neg-' + str(el) + '.pgm',0)
+			#filters_el = []
+
+			if not self.process_frame(im):
+				tf += 1
+
+			#feature_vec = []
+
+			# root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
+
+			# #feature_vec += root_feature.tolist()
+
+			# #normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
+
+			# answers = []
+
+			# answers += [clfs[nmb].predict([root_feature]) == '0']
+
+			# nmb += 1
+
+			# for i in range(0,6):
+			# 	part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
+		 # 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
+
+	 	# 		#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
+		 # 		answers += [clfs[nmb].predict([part_hog]) == '0']
+		 # 		nmb += 1
+
+			# 	#feature_vec += part_hog.tolist()
+			
+
+			# # for i in range(0,6):	
+			# # 	x_hat = (parts[i][1] - 2 * 0 + (50 + 0))/100.0
+			# # 	y_hat = (parts[i][0] - 2 * 0 + (20 + 0))/40.0
+				
+			# # 	feature_vec += [x_hat]
+			# # 	feature_vec += [y_hat]
+			# # 	feature_vec += [x_hat**2]
+			# # 	feature_vec += [y_hat**2]
+
+
+			# # feature_vec_new = []
+			# # norm = np.sqrt(np.dot(feature_vec,feature_vec))
+			# # for elem in feature_vec:
+			# # 	feature_vec_new += [(elem + 0.0/norm)]
+
+			# #score = np.dot(clf.coef_[0],feature_vec)
+			# #scores_neg.append(score)
+			# # if clf.predict([feature_vec_new]) == '0':
+			# # 	tp += 1
+
+			# cnt = 0
+			# for el in answers:
+			# 	if el:
+			# 		cnt += 1
+			# if cnt == 7:
+			# 	tf += 1
+
+		return tp, tf, (tp + tf)/(0.0 + 1050)#scores_pos,scores_neg,
+
+
+		#another trash, delete
+	def get_new_test(self,clfs,pix_per_cell = 8, cells_per_bl = 2,pix_per_cell_1 = 4, cells_per_bl_1 = 2):
+		print 'testing'
+		annotations = open('CarData/trueLocations.txt','r')
+
+		parts = self.parts
+
+		tp = 0
+		all_obj = 0
+		falsepos = 0
+
+		#scores = []
+
+		for count in range(0,170):
+			input_image = cv2.imread('CarData/TestImages/test-' + str(count) + '.pgm',0)
+
+			self.process_image(input_image)
+
+		# 		answers += [clfs[nmb].predict([root_feature]) == '1']
+
+		# 		nmb += 1
+
+
+		# 		for i in range(0,6):
+		# 			#parts in clojure
+		# 			part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
+		# 	 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
+
+	 # 				#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
+
+		# 	 		answers += [clfs[nmb].predict([part_hog]) == '1']
+
+		# 			nmb += 1
+
+		# 			#filters_el.append(part_hog)
+		# 			#feature_vec += part_hog.tolist()
+			
+
+		# 		# for i in range(0,6):	
+		# 		# 	x_hat = (parts[i][1] - 2 * 0 + (50 + 0))/100.0
+		# 		# 	y_hat = (parts[i][0] - 2 * 0 + (20 + 0))/40.0
+				
+		# 		# 	feature_vec += [x_hat]
+		# 	 # 		feature_vec += [y_hat]
+		# 		# 	feature_vec += [x_hat**2]
+		# 		# 	feature_vec += [y_hat**2]
+				
+				
+		# 		cnt = 0
+		# 		for el in answers:
+		# 			if el:
+		# 				cnt += 1
+		# 		if cnt > 0:
+		# 			tp += 1
+				
+		# 		#REMOVE NORMALIZATION
+		# 		# feature_vec_new = []
+		# 		# norm = np.sqrt(np.dot(feature_vec,feature_vec))
+		# 		# for elem in feature_vec:
+		# 		# 	feature_vec_new += [(elem + 0.0/norm)]
+				
+		# 		#score = np.dot(clf.coef_,feature_vec)
+		# 		#scores_pos.append(score)
+		# 		# if clf.predict([feature_vec_new]) == '1':
+		# 		# 	tp += 1
+				
+		# annotations.close()
+		# return (tp+0.0)/all_obj
+
 
