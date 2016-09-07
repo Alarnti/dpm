@@ -103,7 +103,7 @@ class DPM:
 		from sklearn.ensemble import AdaBoostClassifier
 		from sklearn.tree import DecisionTreeClassifier
 		
-		adaboostclf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=2),algorithm='SAMME.R',n_estimators = 1000) #trees_count)
+		adaboostclf = AdaBoostClassifier(DecisionTreeClassifier(max_depth=2),algorithm='SAMME.R',n_estimators = 2000) #trees_count)
 		adaboostclf.fit(X,Y)
 
 		return adaboostclf
@@ -388,9 +388,9 @@ class DPM:
 			#im = cv2.GaussianBlur(im,(7,7),0)
 			#filters_el = []
 
-			im = im[14:36,5:95]
+			#im = im
 
-			root_feature = hog(im, orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
+			root_feature = hog(im[14:36,5:95], orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
 
 			#normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
 
@@ -406,8 +406,8 @@ class DPM:
 			height = len(im)
 			width = len(im[0])
 
-			for y in range(0, height - self.part_h,20):
-				for x in range(0, width - self.part_w,20):
+			for y in range(0, height - self.part_h,5):
+				for x in range(0, width - self.part_w,5):
 					nmb = 1
 
 					part_F = im[y:y + self.part_h,x: x + self.part_w]
@@ -609,12 +609,6 @@ class DPM:
 			return True
 		else:
 			return False
-		# cnt = 0
-		# for el in answers:
-		# 	if el:
-		# 		cnt += 1
-
-		#return cnt
 
 
 
@@ -640,13 +634,13 @@ class DPM:
 				#print res
 				if res:
 					cv2.rectangle(im_result,(x,y),(x + self.image_w,y + self.image_h),(255),1)
-				x += self.step_x + 2
+				x += self.step_x + 6
 				print 
 
 
-			y += self.step_y +  2
+			y += self.step_y +  3
 
-		cv2.imwrite('results_test/' + str(random.random()) + '_' + name + '.jpg',im_result)
+		cv2.imwrite('results_test/' + name + '_' + str(random.random()) + '.jpg',im_result)
 
 
 
@@ -656,7 +650,6 @@ class DPM:
 		tp = 0
 		tf = 0
 
-		#refactor
 		parts = self.parts
 
 		for el in range(0,550):
@@ -666,58 +659,7 @@ class DPM:
 
 			if self.process_frame(im[14:36,5:95]):
 				tp += 1
-
-			# root_feature = hog(im, orientations=9, pixels_per_cell=(pix_per_cell,pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
-
-			# #normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
-			# #feature_vec += root_feature.tolist()
-
-			# answers = []
-
-			# answers += [clfs[nmb].predict([root_feature]) == '1']
-			# # print clfs[nmb].predict([root_feature.tolist()])
-			# # print clfs[nmb].predict([root_feature.tolist()]) == '1'
-
-			# nmb += 1
-
-			# for i in range(0,6):
-			# 	part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
-		 # 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
-
-		 # 		#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
-		 # 		answers += [clfs[nmb].predict([part_hog]) == '1']
-		 # 		# print clfs[nmb].predict([part_hog.tolist()])
-		 # 		# print clfs[nmb].predict([part_hog.tolist()]) == '1'
-
-		 # 		nmb += 1
-			# 	#filters_el.append(part_hog)
-			# 	#feature_vec += part_hog.tolist()
-			
-
-			# # for i in range(0,6):	
-			# # 	x_hat = (parts[i][1] - 2 * 0 + (50 + 0))/100.0
-			# # 	y_hat = (parts[i][0] - 2 * 0 + (20 + 0))/40.0
-				
-			# # 	feature_vec += [x_hat]
-		 # # 		feature_vec += [y_hat]
-			# # 	feature_vec += [x_hat**2]
-			# # 	feature_vec += [y_hat**2]
-				
-			# #commented for AdaBoost
-			# #score = np.dot(clf.coef_[0],feature_vec)
-			# #scores_pos.append(score)
-			# # if clf.predict([feature_vec]) == '1':
-			# # 	tp += 1
-
-			# #print answers
-			# cnt = 0
-			# for el in answers:
-			# 	if el:
-			# 		cnt += 1
-			# if cnt == 7:
-			# 	tp += 1
 		
-
 		for el in range(0,500):
 			nmb = 0
 	
@@ -726,59 +668,6 @@ class DPM:
 
 			if not self.process_frame(im[14:36,5:95]):
 				tf += 1
-
-			#feature_vec = []
-
-			# root_feature = hog(np.asarray(im), orientations=9, pixels_per_cell=(pix_per_cell, pix_per_cell),cells_per_block=(cells_per_bl, cells_per_bl))
-
-			# #feature_vec += root_feature.tolist()
-
-			# #normed_root_feature = [ float(el*el)/np.sqrt(np.dot(root_feature,root_feature))  for el in root_feature]
-
-			# answers = []
-
-			# answers += [clfs[nmb].predict([root_feature]) == '0']
-
-			# nmb += 1
-
-			# for i in range(0,6):
-			# 	part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
-		 # 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
-
-	 	# 		#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
-		 # 		answers += [clfs[nmb].predict([part_hog]) == '0']
-		 # 		nmb += 1
-
-			# 	#feature_vec += part_hog.tolist()
-			
-
-			# # for i in range(0,6):	
-			# # 	x_hat = (parts[i][1] - 2 * 0 + (50 + 0))/100.0
-			# # 	y_hat = (parts[i][0] - 2 * 0 + (20 + 0))/40.0
-				
-			# # 	feature_vec += [x_hat]
-			# # 	feature_vec += [y_hat]
-			# # 	feature_vec += [x_hat**2]
-			# # 	feature_vec += [y_hat**2]
-
-
-			# # feature_vec_new = []
-			# # norm = np.sqrt(np.dot(feature_vec,feature_vec))
-			# # for elem in feature_vec:
-			# # 	feature_vec_new += [(elem + 0.0/norm)]
-
-			# #score = np.dot(clf.coef_[0],feature_vec)
-			# #scores_neg.append(score)
-			# # if clf.predict([feature_vec_new]) == '0':
-			# # 	tp += 1
-
-			# cnt = 0
-			# for el in answers:
-			# 	if el:
-			# 		cnt += 1
-			# if cnt == 7:
-			# 	tf += 1
-
 		return tp, tf, (tp + tf)/(0.0 + 1050)#scores_pos,scores_neg,
 
 
@@ -796,59 +685,7 @@ class DPM:
 		#scores = []
 
 		for count in range(0,170):
-			input_image = cv2.imread('CarData/TestImages/test-' + str(count) + '.pgm',0)
+			input_image = cv2.imread('CarData/TestImages/test-' + str(169 - count) + '.pgm',0)
 
-			self.process_image(input_image, 'testing_' + str(count))
-
-		# 		answers += [clfs[nmb].predict([root_feature]) == '1']
-
-		# 		nmb += 1
-
-
-		# 		for i in range(0,6):
-		# 			#parts in clojure
-		# 			part_F = np.asarray(Image.fromarray(im).crop((parts[i][1],parts[i][0],parts[i][1]+self.part_w,parts[i][0]+self.part_h)))
-		# 	 		part_hog = hog(part_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
-
-	 # 				#normed_feature = [ float(el*el)/np.sqrt(np.dot(part_hog,part_hog))  for el in part_hog]
-
-		# 	 		answers += [clfs[nmb].predict([part_hog]) == '1']
-
-		# 			nmb += 1
-
-		# 			#filters_el.append(part_hog)
-		# 			#feature_vec += part_hog.tolist()
-			
-
-		# 		# for i in range(0,6):	
-		# 		# 	x_hat = (parts[i][1] - 2 * 0 + (50 + 0))/100.0
-		# 		# 	y_hat = (parts[i][0] - 2 * 0 + (20 + 0))/40.0
-				
-		# 		# 	feature_vec += [x_hat]
-		# 	 # 		feature_vec += [y_hat]
-		# 		# 	feature_vec += [x_hat**2]
-		# 		# 	feature_vec += [y_hat**2]
-				
-				
-		# 		cnt = 0
-		# 		for el in answers:
-		# 			if el:
-		# 				cnt += 1
-		# 		if cnt > 0:
-		# 			tp += 1
-				
-		# 		#REMOVE NORMALIZATION
-		# 		# feature_vec_new = []
-		# 		# norm = np.sqrt(np.dot(feature_vec,feature_vec))
-		# 		# for elem in feature_vec:
-		# 		# 	feature_vec_new += [(elem + 0.0/norm)]
-				
-		# 		#score = np.dot(clf.coef_,feature_vec)
-		# 		#scores_pos.append(score)
-		# 		# if clf.predict([feature_vec_new]) == '1':
-		# 		# 	tp += 1
-				
-		# annotations.close()
-		# return (tp+0.0)/all_obj
-
+			self.process_image(input_image, 'testing_' + str(169 - count))
 
