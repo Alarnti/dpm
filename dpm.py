@@ -217,8 +217,6 @@ class DPM:
 		#self.show_images([im])
 		return res_parts
 
-		# if not isinstance(image, Image.Image):
-			# raise Exception('Image should be of type PIL.Image')
 
 
 	def collect_pathes_from_train(self, path):
@@ -549,7 +547,6 @@ class DPM:
 		return np.sqrt((self.parts[filters_nmb - 1][0] - best_coord[0])**2 + (self.parts[filters_nmb - 1][1] - best_coord[1])**2)/(self.parts_count)
 
 
-			answers = []
 
 
 
