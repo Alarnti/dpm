@@ -30,7 +30,7 @@ class DPM:
 		cells_per_block_root = 2, 
 		pix_per_cell_part = 4, 
 		cells_per_block_part = 2, 
-		parts_count = 3, 
+		parts_count = 4, 
 		part_w = 30, 
 		part_h = 20):
 
@@ -56,7 +56,7 @@ class DPM:
 
 		self.filters = []
 
-		self.importance_treshold = 1e-3
+		self.importance_treshold = 1e-4
 		self.importance_features = []
 		self.importance_features_bool = []
 
@@ -75,23 +75,23 @@ class DPM:
 
 		adaboostclf.fit(X,Y)
 
-		print len(adaboostclf.feature_importances_)
+		# print len(adaboostclf.feature_importances_)
 
-		important_features = adaboostclf.feature_importances_ > self.importance_treshold
+		# important_features = adaboostclf.feature_importances_ > self.importance_treshold
 
-		self.importance_features.append(adaboostclf.feature_importances_)
-		np.save('dump_clfs4/importance_' + str(count),adaboostclf.feature_importances_)
-		self.importance_features_bool.append(important_features)
+		# self.importance_features.append(adaboostclf.feature_importances_)
+		# np.save('dump_clfs4/importance_' + str(count),adaboostclf.feature_importances_)
+		# self.importance_features_bool.append(important_features)
 
 
-		X_new = []
+		# X_new = []
 
-		for x in X:
-			X_new.append(list(compress(x,important_features)))
+		# for x in X:
+		# 	X_new.append(list(compress(x,important_features)))
 
-		adaboostclf.fit(X_new,Y)	
+		# adaboostclf.fit(X_new,Y)	
 
-		print len(adaboostclf.feature_importances_)	
+		# print len(adaboostclf.feature_importances_)	
 
 		return adaboostclf
 	
@@ -184,7 +184,7 @@ class DPM:
 							max_y = y
 
 			self.zero_mag_map(mag_map,(max_y,max_x,self.part_h,self.part_w))
-			cv2.imwrite('mag' + str(i) + '.jpg',mag_map)
+			#cv2.imwrite('mag' + str(i) + '.jpg',mag_map)
 			res_parts.append([max_y,max_x])
 			#cv2.imwrite('parts/' + str(i) + '/' + str(random.random()) + '.jpg',im[max_y:max_y+self.part_h,max_x:max_x + self.part_w])
 			#if i == 2:
@@ -281,7 +281,7 @@ class DPM:
 		computed_parts = self.collect_pathes_from_train(path)
 
 		#print computed_parts
-		res =  self.compute_average(computed_parts) #computed_parts[0] 
+		res =  self.compute_average(computed_parts) #computed_parts[0]# 
 		print res
 		return res, computed_parts
 
@@ -400,10 +400,10 @@ class DPM:
 
 		j = 0
 		for j in range(0,self.parts_count + 1):
-			adaboosts7[j] = joblib.load('dump_clfs4/clf_' + str(j) + '.pkl')
-			self.importance_features.append(np.load('dump_clfs4/importance_' + str(j) + '.npy'))
-			important_features = self.importance_features[j] > self.importance_treshold
-			self.importance_features_bool.append(important_features)
+			adaboosts7[j] = joblib.load('dump_clfs4_all_features/clf_' + str(j) + '.pkl')
+			# self.importance_features.append(np.load('dump_clfs4/importance_' + str(j) + '.npy'))
+			# important_features = self.importance_features[j] > self.importance_treshold
+			# self.importance_features_bool.append(important_features)
 
 
 
@@ -423,10 +423,10 @@ class DPM:
 
 		# j = 0
 		# for key in adaboosts7.keys():
-		# 	joblib.dump(adaboosts7[key], 'dump_clfs4/clf_' + str(j) + '.pkl')
+		# 	joblib.dump(adaboosts7[key], 'dump_clfs4_all_features/clf_' + str(j) + '.pkl')
 		# 	j += 1
 
-		# print 'saved'
+		#print 'saved'
 
 		print 'train is over'
 
@@ -435,13 +435,13 @@ class DPM:
 		#return self.train_clf(X_with_filters,Y_with_filters,C=C, kernel=kernel, degree=degree, gamma=gamma, coef0=coef0, trees_count = trees)
 
 
-	def clf_predict(self, pred_vec, clf, clf_count):
+	# def clf_predict(self, pred_vec, clf, clf_count):
 
-		start = time.time()
-		features = list(compress(pred_vec,self.importance_features_bool[clf_count]))
-		stop = time.time()
-		print 'compress_time ', stop - start
-		return clf.predict_proba([list(compress(pred_vec,self.importance_features_bool[clf_count]))])
+	# 	#start = time.time()
+	# 	#features = list(compress(pred_vec,self.importance_features_bool[clf_count]))
+	# 	#stop = time.time()
+	# 	#print 'compress_time ', stop - start
+	# 	return clf[clf_count].predict_proba([pred_vec]) #clf.predict_proba([list(compress(pred_vec,self.importance_features_bool[clf_count]))])
 
 	def process_filter_image(self,im):
 		# start = time.time()
@@ -468,25 +468,25 @@ class DPM:
 		#max_prob = {1:0,2:0,3:0,4:0,5:0,6:0}
 		#max_coord_point = {1:(0,0),2:(0,0),3:(0,0),4:(0,0),5:(0,0),6:(0,0)}
 
-		start_all_hogs = time.time()
-		while y in range(0,height - self.part_h,2):
+		#start_all_hogs = time.time()
+		while y in range(0,height - self.part_h,1):
 			x = 0
-			while x in range(0,width - self.part_w,5):
+			while x in range(0,width - self.part_w,1):
 
 				patch_F = im[y:y+self.part_h,x:x+self.part_w]
 
-				start_hog = time.time()
+				#start_hog = time.time()
 				patch_hog = hog(patch_F, orientations=9, pixels_per_cell=(pix_per_cell_1, pix_per_cell_1),cells_per_block=(cells_per_bl_1, cells_per_bl_1))
-				stop_hog = time.time()
-				print 'time hog little: ', stop_hog - start_hog
+				#stop_hog = time.time()
+				#print 'time hog little: ', stop_hog - start_hog
 
 				for j in range(1,self.parts_count + 1):
 
-					start_predict = time.time()
-					probs = self.clf_predict(patch_hog,self.clfs[j],j)#self.clfs[j].predict_proba([patch_hog])
+					#start_predict = time.time()
+					probs = self.clfs[j].predict_proba([patch_hog])#self.clf_predict(patch_hog,self.clfs[j],j)#
 					#is_part = self.clfs[j].predict([patch_hog]) == '1'
-					stop_predict = time.time()
-					print 'time predict: ', stop_predict - start_predict
+					# stop_predict = time.time()
+					#print 'time predict: ', stop_predict - start_predict
 
 					if probs[0][1] > 0.5 and probs[0][1] > max_prob[j]:# and is_part:# and self.clfs[j].predict([patch_hog]):
 						#cv2.imwrite('parts/' + str(j) + '/' + str(random.random()) + '.jpg', patch_F)
@@ -499,9 +499,9 @@ class DPM:
 
 			y += self.step_y
 
-		stop = time.time()
+		#stop = time.time()
 
-		print 'time all hogs little: ', stop - start_all_hogs
+		#print 'time all hogs little: ', stop - start_all_hogs
 		print max_prob
 		# print 'time elaplsed all: ', stop - start
 		return max_coord_point
@@ -515,8 +515,10 @@ class DPM:
 
 
 
+	ALL_SUMM = 0
+	ALL_COUNT = 0
 
-	def process_frame(self,im):
+	def process_frame(self,im,tres_main,tres_nomain):
 		nmb = 0
 
 		summ_cost = 0
@@ -534,7 +536,7 @@ class DPM:
 
 
 		main_filter = False
-		if self.clf_predict(root_feature,self.clfs[nmb],nmb)[0][1] == '1':# self.clfs[nmb].predict([root_feature])[0][1] == '1':
+		if self.clfs[nmb].predict([root_feature]) == '1': #self.clf_predict(root_feature,self.clfs[nmb],nmb)[0][1] == '1':
 			print 'main filter'
 			summ_cost += 0.5
 			main_filter = True
@@ -554,13 +556,19 @@ class DPM:
 
 			summ_cost += cost
 
+			self.ALL_SUMM += summ_cost
+			self.ALL_COUNT += 1
+
+
 	 	print 'summ_cost ', summ_cost
 
 	 	if main_filter:
 
-	 		tresh = 1
+	 		#tresh = 1
+	 		tresh = tres_main
 	 	else:
-	 		tresh = 1.4
+	 		#tresh = 1.4
+	 		tresh = tres_nomain
 		if summ_cost > tresh:
 			print 'car here'
 			return True
@@ -648,9 +656,12 @@ class DPM:
 		accuracy = (tp + tn)/(0.0 + tp+fn+fp+tn)
 		f1 = 2*precision * recall/(precision + recall)
 
+
+		print 'ALL_SUMM: ', self.ALL_SUMM, ' ALL_COUNT: ', self.ALL_COUNT, ' divide ' , float(self.ALL_SUMM)/self.ALL_COUNT
+
 		print 'RESULT: ','tp=',tp, 'fp=',fp,"tn=",tn,"fn=",fn,"recall=",recall,"precision=",precision,"accuracy=",accuracy ,"f1=",f1
 
-	def test_valid(self,clfs):
+	def test_valid(self,clfs, tres_main,tres_nomain):
 		print 'testing validation set'
 
 		tp = 0
@@ -669,7 +680,7 @@ class DPM:
 	
 			im = cv2.imread('CarData/TrainImages/pos-' + str(el) + '.pgm',0)
 
-			if self.process_frame(im[14:36,5:95]):
+			if self.process_frame(im[14:36,5:95],tres_main,tres_nomain):
 				tp += 1
 			else:
 				fp += 1
@@ -684,7 +695,7 @@ class DPM:
 			im = cv2.imread('CarData/TrainImages/neg-' + str(el) + '.pgm',0)
 			#filters_el = []
 
-			if not self.process_frame(im[14:36,5:95]):
+			if not self.process_frame(im[14:36,5:95],tres_main,tres_nomain):
 				tn += 1
 			else:
 				fn += 1
@@ -697,7 +708,7 @@ class DPM:
 		accuracy = (tp + tn)/(0.0 + tp+fn+fp+tn)
 		f1 = 2*precision * recall/(precision + recall)
 
-		print 'RESULT_VALID: ','tp=',tp, 'fp=',fp,"tn=",tn,"fn=",fn,"recall=",recall,"precision=",precision,"accuracy=",accuracy ,"f1=",f1
+		print 'RESULT_VALID: ','tres_main=',tres_main,' tres_nomain=', tres_nomain,' tp=',tp, 'fp=',fp,"tn=",tn,"fn=",fn,"recall=",recall,"precision=",precision,"accuracy=",accuracy ,"f1=",f1
 
 
 		#another trash, delete
@@ -714,7 +725,13 @@ class DPM:
 		tp = 0
 		fp = 0
 
+
+		tn = 0
+		fn = 0
+
 		for count in range(0,170):
+
+			print 'Image #', count
 			input_image = cv2.imread('CarData/TestImages/test-' + str(count) + '.pgm',0)
 
 			inp = annotations.readline()
@@ -738,10 +755,10 @@ class DPM:
 				coords.append((y,x))
 
 
-			p = 0
+			#p = 0
 			for car in coords:
 
-				cv2.imwrite('CarData/test_little_images/pos-' + str(count) + '-' + str(p) + '.jpg',input_image[y:y+40,x:x+100])
+				#cv2.imwrite('CarData/test_little_images/pos-' + str(count) + '-' + str(p) + '.jpg',input_image[y:y+40,x:x+100])
 
 				# cv2.imshow('a',input_image[y:y+40,x:x+100][14:36,5:95])
 				# cv2.waitKey(0)
@@ -751,6 +768,31 @@ class DPM:
 					tp += 1
 				else:
 					fp += 1
-			p += 1
 
-		print tp, ' ', fp
+
+
+
+			im_neg1 = input_image[0:0+40,0:0+100][14:36,5:95]
+			im_neg2 = input_image[len(input_image)-40:,len(input_image[0])-100:][14:36,5:95]
+
+			cv2.imwrite('CarData/test_little_images/neg-' + str(count) + '-' + str(0) + '.jpg',im_neg1)
+			cv2.imwrite('CarData/test_little_images/neg-' + str(count) + '-' + str(1) + '.jpg',im_neg2)
+
+			if not self.process_frame(im_neg1):
+				tn += 1
+			else:
+				fn += 1
+
+			if not self.process_frame(im_neg2):
+				tn += 1
+			else:
+				fn += 1
+
+
+		recall = tp/(0.0+tp+fn)
+		precision = tp/(0.0+tp+fp)
+		accuracy = (tp + tn)/(0.0 + tp+fn+fp+tn)
+		f1 = 2*precision * recall/(precision + recall)
+
+		print 'TEST__VALID: ','tp=',tp, 'fp=',fp,"tn=",tn,"fn=",fn,"recall=",recall,"precision=",precision,"accuracy=",accuracy ,"f1=",f1
+
