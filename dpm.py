@@ -17,9 +17,38 @@ def normalize(v):
 
 
 class DPM:
+	"""
+	This implementation of Deformable part models algorithm is only valuable for UIUC dataset.
+	Here there are a lot of "magic" numbers, which I explain, but they, again, came from UIUC dataset.
+
+	First of all, some sources of information:
+	1. Dalal N., Triggs B. Histograms of oriented gradients for human detection
+		//2005 IEEE Computer Society Conference on Computer Vision and
+		Pattern Recognition (CVPR'05). – IEEE, 2005. – Т. 1. – С. 886-893.
+
+	2. Felzenszwalb P. et al. Visual object detection with deformable part
+		models //Communications of the ACM. – 2013. – Т. 56. – №. 9. – С.97-105.
 	
-	image_h = 22 # 14 - 36
-	image_w = 90 # 5 - 95
+	3. Felzenszwalb P., McAllester D., Ramanan D. A discriminatively trained,
+		multiscale, deformable part model //Computer Vision and Pattern
+		Recognition, 2008. CVPR 2008. IEEE Conference on. – IEEE, 2008. – С.1-8.
+	
+	4. Felzenszwalb P. F. et al. Object detection with discriminatively trained
+		part-based models //IEEE transactions on pattern analysis and machine
+		intelligence. – 2010. – Т. 32. – №. 9. – С. 1627-1645.
+	5. Q&A of the Deformable Part Model by Philipp Krähenbühl // presentation from Machine Learning Course, 2013
+	
+	6. Computer Vision Final Project Rapid Object Detection using a Boosted
+		Cascade of Simple Feature and Fast Face Detection via
+		Morphology-Based Pre-processing by Kihwan Kim //
+
+	7. Poggio T., Cauwenberghs G. Incremental and decremental support vector
+		machine learning //Advances in neural information processing systems. –
+		2001. – Т. 13. – С. 409.
+
+	8. https://gilscvblog.com/2013/08/18/a-short-introduction-to-descriptors
+
+	"""
 
 	def __init__(
 		self, 
@@ -32,7 +61,15 @@ class DPM:
 		parts_count = 4, 
 		part_w = 30, 
 		part_h = 20):
+	"""
+	Here we initilize some important parts of the the algorithm
 
+	step_x --- our step (x direction) in sliding window
+
+	"""
+
+		self.image_h = 22 # 14 - 36
+		self.image_w = 90 # 5 - 95
 		self.step_x = step_x
 		self.step_y = step_y
 
