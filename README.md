@@ -1,6 +1,2 @@
 # dpm
-Implementation of deformable part models algorithm in Python 
-
-Now code is unfortunately really dirty
-
-In progress
+Implementation of deformable part models algorithm in Python with UIUC 'Image Database for Car Detection' dataset.
